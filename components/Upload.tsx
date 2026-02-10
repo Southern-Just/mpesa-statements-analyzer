@@ -1,14 +1,11 @@
 "use client"
 import Image from 'next/image'
-import UploadCard from '@/components/UploadCard'
-import PreviewCard from '@/components/PreviewCard'
-import ProgressArrow from '@/components/ProgressArrow'
 import React, { useState } from 'react'
+import SearchFilters from './SearchFilters'
 
 const Upload = () => {
-  const [progress, setProgress] = useState<number>(0)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -23,27 +20,74 @@ const Upload = () => {
     } else {
       setPreviewUrl(null)
     }
-
-    setProgress(0)
-    let value = 0
-    const interval = setInterval(() => {
-      value += 10
-      setProgress(value)
-      if (value >= 100) clearInterval(interval)
-    }, 150)
   }
 
   return (
-    <div className="flex w-full max-w-6xl items-center justify-center gap-10">
+    <div className="flex w-full max-w-6xl items-center gap-10">
       
-      {/* LEFT: Upload */}
-      <UploadCard onChange={handleFileChange} />
+      <div className="w-80 rounded-2xl bg-white p-6 shadow-lg">
+        <div className="flex justify-center">
+          {previewUrl ? (
+            <Image
+              width={200}
+              height={200}
+              src={previewUrl}
+              alt="Uploaded preview"
+              className="h-32 rounded-lg object-contain"
+            />
+          ) : (
+            <Image
+              src="/icons/file.svg"
+              alt="Upload"
+              width={120}
+              height={120}
+            />
+          )}
+        </div>
 
-      {/* CENTER: Progress */}
-      <ProgressArrow progress={progress} />
+        <p className="mt-4 text-center font-medium text-gray-800">
+          Upload MPESA Statement
+        </p>
+        <p className="mt-1 text-center text-sm text-gray-500">
+          PDF · DOCX · CSV
+        </p>
 
-      {/* RIGHT: Preview */}
-      <PreviewCard previewUrl={previewUrl} fileName={fileName} />
+        <label className="mt-6 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-gray-300 p-4 transition hover:border-blue-500 hover:bg-blue-50">
+          <span className="text-sm font-medium text-gray-700">
+            Choose file
+          </span>
+
+          <input
+            type="file"
+            accept=".pdf,.docx,.csv,image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </label>
+
+        {fileName && (
+          <p className="mt-3 text-center text-xs text-gray-500">
+            {fileName}
+          </p>
+        )}
+      </div>
+      <div className="flex w-64 flex-col items-center  shadow-2xl shadow-gray-50">
+        <div className="relative w-full">
+          <div className="h-2 w-full rounded-full bg-gray-200" />
+          <div
+            className="absolute left-0 top-0 h-2 rounded-full bg-black"
+            style={{ width: '45%' }}
+          />
+          <div
+            className="absolute -top-1.5 h-0 w-0 border-y-8 border-l-8 border-y-transparent border-l-black"
+            style={{ left: '45%' }}
+          />
+        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Processing statement
+        </p>
+      </div>
+      <SearchFilters />
 
     </div>
   )
