@@ -21,7 +21,7 @@ export default function Home() {
           <div className="space-y-4 text-gray-700">
             <div className="pl-4 border-l space-y-1">
               <p className="text-sm text-gray-500">Safaricom USSD menu</p>
-              <p className="font-medium text-3xl text-center">*334#</p>
+                <p className="font-medium text-3xl text-center">*334#</p>
               <p className="text-sm text-gray-600">My Account</p>
               <p className="text-sm text-gray-600">Request Statement</p>
               <p className="text-sm text-gray-600">Add Email Address</p>
@@ -39,8 +39,8 @@ export default function Home() {
         </div>
       </div>
       <section>
-        <Upload/>
-        {/* <Reports/> */}
+        <Upload />
+        <Reports />
       </section>
     </main>
   );
