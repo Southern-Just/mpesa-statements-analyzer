@@ -5,23 +5,24 @@ import React, { useState } from "react";
 import SearchFilters from "./SearchFilters";
 import ProcessingEngine from "./ProcessingEngine";
 import { ProcessedData } from "@/types.d";
+import { processFile } from "@/lib/file.actions";
 
 const Upload = () => {
   const [fileName, setFileName] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [fileType, setFileType] = useState<string | null>(null);
   const [extension, setExtension] = useState<string>("OTHER");
   const [processedData, setProcessedData] = useState<ProcessedData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.type !== "application/pdf") {
       alert("Please upload a PDF file only.");
-      e.target.value = "";
       resetState();
       return;
     }
@@ -29,38 +30,35 @@ const Upload = () => {
     setFileName(file.name);
     setExtension(file.name.split(".").pop()?.toUpperCase() || "PDF");
     setPreviewUrl(URL.createObjectURL(file));
-    setFileType("pdf");
     setError(null);
-    setSelectedFile(file);
+
+    try {
+      setIsProcessing(true);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const result = await processFile(formData);
+
+      if (result.success && result.data) {
+        setProcessedData(result.data);
+      } else {
+        setError(result.error || "Failed to process file");
+      }
+    } catch {
+      setError("Unexpected error occurred");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const resetState = () => {
     setFileName(null);
     setPreviewUrl(null);
-    setFileType(null);
     setExtension("OTHER");
     setProcessedData(null);
     setError(null);
-    setSelectedFile(null);
-  };
-
-  const resetFileInput = () => {
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = "";
-    }
-    resetState();
-  };
-
-  const handleProcessed = (data: ProcessedData) => {
-    setProcessedData(data);
-    console.log("Processed data:", data);
-  };
-
-  const handleError = (error: string) => {
-    setError(error);
-    console.error("Error:", error);
-    resetFileInput();
+    setIsProcessing(false);
   };
 
   return (
@@ -71,8 +69,7 @@ const Upload = () => {
             <div className="w-full h-48 overflow-hidden">
               <iframe
                 src={previewUrl}
-                className="w-full h-full border-0 m-0 p-0"
-                scrolling="no"
+                className="w-full h-full border-0"
                 title="PDF Preview"
               />
             </div>
@@ -82,7 +79,6 @@ const Upload = () => {
               alt="Upload"
               width={160}
               height={160}
-              className="overflow-hidden"
             />
           )}
         </div>
@@ -102,29 +98,28 @@ const Upload = () => {
           </>
         )}
 
-        <label className="mt-6 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-gray-300 p-4 transition hover:border-brand">
+        <label className="mt-6 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-gray-300 p-4 hover:border-brand transition">
           <span className="text-sm font-medium text-gray-700">
             {fileName ? "Change file" : "Choose PDF"}
           </span>
           <input
             type="file"
-            name="file"
             accept=".pdf"
             onChange={handleFileChange}
             className="hidden"
           />
         </label>
 
-        {fileName && (
-          <p className="mt-3 text-center text-xs text-gray-500">{fileName}</p>
-        )}
-
         {error && (
           <p className="mt-3 text-center text-xs text-red-500">{error}</p>
         )}
       </div>
 
-      <ProcessingEngine file={selectedFile} onProcessed={handleProcessed} onError={handleError} />
+      <ProcessingEngine
+        isProcessing={isProcessing}
+        hasFile={!!fileName}
+      />
+
       <SearchFilters />
     </div>
   );
