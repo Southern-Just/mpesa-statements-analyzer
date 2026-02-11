@@ -2,7 +2,7 @@
 
 import { FILTERS } from '@/lib/utils'
 import { FilterType } from '@/types'
-import React, { useState } from 'react'
+import { useState } from 'react'
 
 const SearchFilters = () => {
   const [activeFilter, setActiveFilter] = useState<FilterType>('name')
