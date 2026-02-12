@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import SearchFilters from "./SearchFilters";
 import ProcessingEngine from "./ProcessingEngine";
 import StatementPreviewModal from "./StatementPreviewModal";
@@ -18,30 +18,25 @@ const Upload = () => {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // 🔥 Modal preview state
   const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
   const [previewTransactions, setPreviewTransactions] = useState<Transaction[]>([]);
   const [previewTitle, setPreviewTitle] = useState<string>("");
 
-  // 🔥 Anchor reference for expansion animation
   const searchRef = useRef<HTMLDivElement | null>(null);
   const [originRect, setOriginRect] = useState<DOMRect | null>(null);
 
-  /**
-   * Handles real file upload (still works normally)
-   */
-  const handleFileChange = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ): Promise<void> => {
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
+  const [password, setPassword] = useState("");
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.type !== "application/pdf") {
       alert("Please upload a PDF file only.");
       resetState();
       return;
     }
-
     setFileName(file.name);
     setExtension(file.name.split(".").pop()?.toUpperCase() ?? "PDF");
     setPreviewUrl(URL.createObjectURL(file));
@@ -49,14 +44,16 @@ const Upload = () => {
 
     try {
       setIsProcessing(true);
-
       const formData = new FormData();
       formData.append("file", file);
-
       const result = await processFile(formData);
-
-      if (result.success && result.data) {
+      if (result.isPasswordProtected) {
+        setIsPasswordProtected(true);
+        setError(result.error ?? "PDF is password protected");
+        setProcessedData(null);
+      } else if (result.success && result.data) {
         setProcessedData(result.data);
+        setIsPasswordProtected(false);
       } else {
         setError(result.error ?? "Failed to process file");
       }
@@ -67,19 +64,45 @@ const Upload = () => {
     }
   };
 
-  /**
-   * Called when user clicks a FILTER BADGE.
-   * This simulates “PDF parsed → show statement”.
-   */
+  useEffect(() => {
+    if (isPasswordProtected && passwordInputRef.current) passwordInputRef.current.focus();
+  }, [isPasswordProtected]);
+
+  useEffect(() => {
+    if (!isPasswordProtected || !password || !previewUrl || !fileName) return;
+
+    const unlock = async () => {
+      try {
+        setIsProcessing(true);
+        const response = await fetch(previewUrl);
+        const blob = await response.blob();
+        const file = new File([blob], fileName);
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("password", password);
+        const result = await processFile(formData);
+        if (result.success && result.data) {
+          setProcessedData(result.data);
+          setIsPasswordProtected(false);
+          setError(null);
+        } else if (result.isPasswordProtected) {
+          setError(result.error ?? "Incorrect password");
+        }
+      } catch {
+        setError("Unexpected error occurred");
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    unlock();
+  }, [password, isPasswordProtected, previewUrl, fileName]);
+
   const handlePreviewRequest = (filter: string): void => {
     if (!searchRef.current) return;
-
     const rect = searchRef.current.getBoundingClientRect();
     setOriginRect(rect);
-
-    // simulate parsed output variability
     const generated: Transaction[] = generateFakeTransactions(filter);
-
     setPreviewTransactions(generated);
     setPreviewTitle(`MPESA Statement • ${filter.toUpperCase()}`);
     setIsPreviewOpen(true);
@@ -92,77 +115,60 @@ const Upload = () => {
     setProcessedData(null);
     setError(null);
     setIsProcessing(false);
+    setIsPasswordProtected(false);
+    setPassword("");
   };
 
   return (
     <>
       <div className="flex w-full max-w-6xl items-center gap-10">
-        {/* Upload Card */}
-        <div className="w-80 rounded-2xl bg-white p-2 shadow-2xl shadow-gray-50">
-          <div className="flex justify-center w-full overflow-hidden">
+        <div className="w-80 rounded-2xl bg-white p-2 shadow-2xl shadow-gray-50 relative">
+          <div className="flex justify-center w-full overflow-hidden relative">
             {previewUrl ? (
-              <div className="w-full h-48 overflow-hidden">
-                <iframe
-                  src={previewUrl}
-                  className="w-full h-full border-0"
-                  title="PDF Preview"
-                />
+              <div className="w-full h-48 overflow-hidden relative">
+                <iframe src={previewUrl} className="w-full h-full border-0" title="PDF Preview" />
+                {isPasswordProtected && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm z-20 rounded-2xl">
+                    <div className="bg-white p-6 rounded-xl shadow-lg w-72 text-center">
+                      <h3 className="mb-4 text-lg font-medium text-gray-800">PDF is Password Protected</h3>
+                      <input
+                        ref={passwordInputRef}
+                        type="password"
+                        placeholder="Enter password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                      />
+                      {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <Image
-                src="/icons/file.svg"
-                alt="Upload"
-                width={160}
-                height={160}
-              />
+              <Image src="/icons/file.svg" alt="Upload" width={160} height={160} />
             )}
           </div>
-
           {fileName ? (
-            <p className="mt-1 text-center text-sm text-gray-500">
-              {extension} Uploaded
-            </p>
+            <p className="mt-1 text-center text-sm text-gray-500">{extension} Uploaded</p>
           ) : (
             <>
-              <p className="mt-4 text-center font-medium text-gray-800">
-                Upload MPESA Statement
-              </p>
-              <p className="mt-1 text-center text-sm text-gray-500">
-                PDF only
-              </p>
+              <p className="mt-4 text-center font-medium text-gray-800">Upload MPESA Statement</p>
+              <p className="mt-1 text-center text-sm text-gray-500">PDF only</p>
             </>
           )}
-
           <label className="mt-6 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-gray-300 p-4 hover:border-brand transition">
-            <span className="text-sm font-medium text-gray-700">
-              {fileName ? "Change file" : "Choose PDF"}
-            </span>
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={handleFileChange}
-              className="hidden"
-            />
+            <span className="text-sm font-medium text-gray-700">{fileName ? "Change file" : "Choose PDF"}</span>
+            <input type="file" accept=".pdf" onChange={handleFileChange} className="hidden" />
           </label>
-
-          {error && (
-            <p className="mt-3 text-center text-xs text-red-500">{error}</p>
-          )}
         </div>
 
-        {/* Processing Animation */}
-        <ProcessingEngine
-          isProcessing={isProcessing}
-          hasFile={Boolean(fileName)}
-        />
+        <ProcessingEngine isProcessing={isProcessing} hasFile={Boolean(fileName)} />
 
-        {/* Search + Filters (ANCHOR POINT) */}
         <div ref={searchRef}>
           <SearchFilters onPreviewRequest={handlePreviewRequest} />
         </div>
       </div>
 
-      {/* Expanding Statement Modal */}
       {isPreviewOpen && originRect && (
         <StatementPreviewModal
           originRect={originRect}
