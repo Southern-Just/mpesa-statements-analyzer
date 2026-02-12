@@ -1,4 +1,3 @@
-import Reports from "@/components/Reports";
 import Upload from "@/components/Upload";
 
 export default function Home() {
@@ -40,7 +39,6 @@ export default function Home() {
       </div>
       <section>
         <Upload />
-        <Reports />
       </section>
     </main>
   );

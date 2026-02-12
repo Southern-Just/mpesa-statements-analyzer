@@ -5,6 +5,7 @@ import React, { useRef, useState } from "react";
 import SearchFilters from "./SearchFilters";
 import ProcessingEngine from "./ProcessingEngine";
 import StatementPreviewModal from "./StatementPreviewModal";
+import Reports from "./Reports";
 import { ProcessedData, Transaction } from "@/types";
 import { processFile } from "@/lib/file.actions";
 import { generateFakeTransactions } from "@/lib/fakeParser";
@@ -170,6 +171,8 @@ const Upload = () => {
           onClose={() => setIsPreviewOpen(false)}
         />
       )}
+
+      <Reports onOpenReport={handlePreviewRequest} />
     </>
   );
 };
