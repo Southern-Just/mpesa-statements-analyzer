@@ -27,6 +27,7 @@ const Upload = () => {
 
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const [password, setPassword] = useState("");
+  const [rawFile, setRawFile] = useState<File | null>(null);
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -40,6 +41,7 @@ const Upload = () => {
     setFileName(file.name);
     setExtension(file.name.split(".").pop()?.toUpperCase() ?? "PDF");
     setPreviewUrl(URL.createObjectURL(file));
+    setRawFile(file);
     setError(null);
 
     try {
@@ -69,16 +71,13 @@ const Upload = () => {
   }, [isPasswordProtected]);
 
   useEffect(() => {
-    if (!isPasswordProtected || !password || !previewUrl || !fileName) return;
+    if (!isPasswordProtected || !password || !rawFile) return;
 
     const unlock = async () => {
       try {
         setIsProcessing(true);
-        const response = await fetch(previewUrl);
-        const blob = await response.blob();
-        const file = new File([blob], fileName);
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", rawFile);
         formData.append("password", password);
         const result = await processFile(formData);
         if (result.success && result.data) {
@@ -96,7 +95,7 @@ const Upload = () => {
     };
 
     unlock();
-  }, [password, isPasswordProtected, previewUrl, fileName]);
+  }, [password, isPasswordProtected, rawFile]);
 
   const handlePreviewRequest = (filter: string): void => {
     if (!searchRef.current) return;
@@ -117,6 +116,7 @@ const Upload = () => {
     setIsProcessing(false);
     setIsPasswordProtected(false);
     setPassword("");
+    setRawFile(null);
   };
 
   return (
