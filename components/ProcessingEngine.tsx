@@ -23,7 +23,7 @@ export default function ProcessingEngine({
     return Array.from({ length: 50 }, (_, i) => {
       const x = (i / 49) * 256;
       const height =
-        20 + 30 * Math.sin((i / 49) * Math.PI * 4 + (active ? tick * 0.2 : 0));
+        20 + 30 * Math.sin((i / 49) * Math.PI * 4 + (active ? -tick * 0.2 : 0));
       const y = 40 - height / 2;
 
       return (
