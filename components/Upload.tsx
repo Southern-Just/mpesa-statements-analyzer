@@ -1,14 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useTransition } from "react";
 import SearchFilters from "./SearchFilters";
 import ProcessingEngine from "./ProcessingEngine";
 import StatementPreviewModal from "./StatementPreviewModal";
 import Reports from "./Reports";
-import { ProcessedData, Transaction } from "@/types";
-import { processFile } from "@/lib/file.actions";
+import { Transaction } from "@/types";
+import { processUpload } from "@/app/upload/actions";
 import { generateFakeTransactions } from "@/lib/fakeParser";
+
+export type ProcessedData = {
+  jobId: string;
+  pageCount: number;
+};
 
 const Upload = () => {
   const [fileName, setFileName] = useState<string | null>(null);
@@ -17,20 +22,18 @@ const Upload = () => {
   const [processedData, setProcessedData] = useState<ProcessedData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-
   const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
   const [previewTransactions, setPreviewTransactions] = useState<Transaction[]>([]);
   const [previewTitle, setPreviewTitle] = useState<string>("");
-
   const searchRef = useRef<HTMLDivElement | null>(null);
   const [originRect, setOriginRect] = useState<DOMRect | null>(null);
-
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const [password, setPassword] = useState("");
   const [rawFile, setRawFile] = useState<File | null>(null);
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== "application/pdf") {
@@ -44,12 +47,15 @@ const Upload = () => {
     setRawFile(file);
     setError(null);
 
-    try {
+    startTransition(async () => {
+      if (!file) return;
       setIsProcessing(true);
       const formData = new FormData();
       formData.append("file", file);
-      const result = await processFile(formData);
-      if (result.isPasswordProtected) {
+      const result = await processUpload(formData);
+      setIsProcessing(false);
+
+      if (result.requiresPassword) {
         setIsPasswordProtected(true);
         setError(result.error ?? "PDF is password protected");
         setProcessedData(null);
@@ -58,11 +64,29 @@ const Upload = () => {
         setIsPasswordProtected(false);
       } else {
         setError(result.error ?? "Failed to process file");
+        setProcessedData(null);
       }
-    } catch {
-      setError("Unexpected error occurred");
-    } finally {
-      setIsProcessing(false);
+    });
+  };
+
+  const submitPassword = async () => {
+    if (!rawFile) return;
+    const formData = new FormData();
+    formData.append("file", rawFile);
+    formData.append("password", password);
+    setIsProcessing(true);
+    const result = await processUpload(formData);
+    setIsProcessing(false);
+
+    if (result.requiresPassword) {
+      setError(result.error ?? "Incorrect password");
+    } else if (result.success && result.data) {
+      setProcessedData(result.data);
+      setIsPasswordProtected(false);
+      setError(null);
+    } else {
+      setError(result.error ?? "Failed to process file");
+      setProcessedData(null);
     }
   };
 
@@ -70,34 +94,7 @@ const Upload = () => {
     if (isPasswordProtected && passwordInputRef.current) passwordInputRef.current.focus();
   }, [isPasswordProtected]);
 
-  useEffect(() => {
-    if (!isPasswordProtected || !password || !rawFile) return;
-
-    const unlock = async () => {
-      try {
-        setIsProcessing(true);
-        const formData = new FormData();
-        formData.append("file", rawFile);
-        formData.append("password", password);
-        const result = await processFile(formData);
-        if (result.success && result.data) {
-          setProcessedData(result.data);
-          setIsPasswordProtected(false);
-          setError(null);
-        } else if (result.isPasswordProtected) {
-          setError(result.error ?? "Incorrect password");
-        }
-      } catch {
-        setError("Unexpected error occurred");
-      } finally {
-        setIsProcessing(false);
-      }
-    };
-
-    unlock();
-  }, [password, isPasswordProtected, rawFile]);
-
-  const handlePreviewRequest = (filter: string): void => {
+  const handlePreviewRequest = (filter: string) => {
     if (!searchRef.current) return;
     const rect = searchRef.current.getBoundingClientRect();
     setOriginRect(rect);
@@ -107,7 +104,7 @@ const Upload = () => {
     setIsPreviewOpen(true);
   };
 
-  const resetState = (): void => {
+  const resetState = () => {
     setFileName(null);
     setPreviewUrl(null);
     setExtension("OTHER");
@@ -137,8 +134,15 @@ const Upload = () => {
                         placeholder="Enter password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && submitPassword()}
                         className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                       />
+                      <button
+                        onClick={submitPassword}
+                        className="mt-3 w-full rounded-md bg-brand text-white py-2 text-sm"
+                      >
+                        Unlock & Process
+                      </button>
                       {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
                     </div>
                   </div>
@@ -162,7 +166,7 @@ const Upload = () => {
           </label>
         </div>
 
-        <ProcessingEngine isProcessing={isProcessing} hasFile={Boolean(fileName)} />
+        <ProcessingEngine isProcessing={isProcessing || isPending} hasFile={Boolean(fileName)} />
 
         <div ref={searchRef}>
           <SearchFilters onPreviewRequest={handlePreviewRequest} />
