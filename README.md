@@ -17,12 +17,15 @@ UI subscribes / refreshes to show parsed data
 ## integration with savings-systeme
 
 1️⃣ tempFileManager.ts
+
 2️⃣ enqueue.ts + worker.ts
+
 3️⃣ Server Action wiring
+
 4️⃣ unlockPdf.ts
 
 
-mpesa-parser/
+<!-- mpesa-parser/
 │
 ├── app/
 │   ├── upload/
@@ -49,6 +52,6 @@ mpesa-parser/
 ├── types/
 │   └── mpesa.ts
 │
-└── data/
+└── data/ -->
 
-npm install execa
+install execa
