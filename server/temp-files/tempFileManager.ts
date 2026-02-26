@@ -40,7 +40,9 @@ export async function createTempWorkspace(): Promise<TempWorkspace> {
       force: true,
     });
   }
-
+ async function deleteTemps(): Promise<T>{
+   await fs.rm()
+ }
   return {
     jobId,
     root,
